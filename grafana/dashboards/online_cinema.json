@@ -1,0 +1,247 @@
+{
+  "uid": "online-cinema",
+  "title": "Online Cinema Analytics",
+  "tags": [
+    "online-cinema",
+    "kafka",
+    "clickhouse"
+  ],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 2,
+  "refresh": "30s",
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "Retention Cohort Heatmap",
+      "description": "Когорта — дата первого VIEW_STARTED. День N — доля пользователей с любым событием в N-й календарный день после первого просмотра. Незрелые дни отображаются пустыми.",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT cohort_date AS Cohort, round(maxIf(retention_rate, day_number = 0), 1) AS `Day 0`, if(countIf(day_number = 1) > 0, round(maxIf(retention_rate, day_number = 1), 1), CAST(NULL, 'Nullable(Float64)')) AS `Day 1`, if(countIf(day_number = 2) > 0, round(maxIf(retention_rate, day_number = 2), 1), CAST(NULL, 'Nullable(Float64)')) AS `Day 2`, if(countIf(day_number = 3) > 0, round(maxIf(retention_rate, day_number = 3), 1), CAST(NULL, 'Nullable(Float64)')) AS `Day 3`, if(countIf(day_number = 4) > 0, round(maxIf(retention_rate, day_number = 4), 1), CAST(NULL, 'Nullable(Float64)')) AS `Day 4`, if(countIf(day_number = 5) > 0, round(maxIf(retention_rate, day_number = 5), 1), CAST(NULL, 'Nullable(Float64)')) AS `Day 5`, if(countIf(day_number = 6) > 0, round(maxIf(retention_rate, day_number = 6), 1), CAST(NULL, 'Nullable(Float64)')) AS `Day 6`, if(countIf(day_number = 7) > 0, round(maxIf(retention_rate, day_number = 7), 1), CAST(NULL, 'Nullable(Float64)')) AS `Day 7` FROM retention_cohort FINAL WHERE cohort_date >= today() - 30 GROUP BY cohort_date ORDER BY cohort_date"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "center",
+            "cellOptions": {
+              "type": "color-background",
+              "mode": "gradient"
+            },
+            "inspect": false
+          },
+          "decimals": 1,
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 20
+              },
+              {
+                "color": "yellow",
+                "value": 45
+              },
+              {
+                "color": "green",
+                "value": 70
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cohort"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "DAU",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 10
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT toDateTime(metric_date) AS time, metric_value AS value FROM daily_metrics FINAL WHERE metric_name = 'dau' AND metric_date >= today() - 30 ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "View Conversion",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 10
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT toDateTime(metric_date) AS time, metric_value * 100 AS value FROM daily_metrics FINAL WHERE metric_name = 'conversion_rate' AND metric_date >= today() - 30 ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Top Movies by Started Views",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT metric_date, rank, movie_id, views FROM top_movies FINAL WHERE metric_date >= today() - 30 ORDER BY metric_date DESC, rank"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Events by Device",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT metric_date, device_type, events FROM device_distribution FINAL WHERE metric_date >= today() - 30 ORDER BY metric_date DESC, events DESC"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Average Finished Watch Progress (seconds)",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 26
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT toDateTime(metric_date) AS time, metric_value AS value FROM daily_metrics FINAL WHERE metric_name = 'avg_watch_time_seconds' AND metric_date >= today() - 30 ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      }
+    }
+  ]
+}
